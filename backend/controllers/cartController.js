@@ -1,0 +1,220 @@
+import User from '../models/User.js';
+import Product from '../models/Product.js';
+import { successResponse, errorResponse } from '../utils/apiResponse.js';
+import ApiError from '../utils/apiError.js';
+
+/**
+ * @desc    Add item to cart
+ * @route   POST /api/cart/add
+ * @access  Private (Customer)
+ */
+export const addToCart = async (req, res, next) => {
+  try {
+    const { productId, quantity = 1 } = req.body;
+
+    // Validate input
+    if (!productId) {
+      throw new ApiError(400, 'Product ID is required');
+    }
+
+    if (quantity <= 0) {
+      throw new ApiError(400, 'Quantity must be greater than 0');
+    }
+
+    // Check if product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      throw new ApiError(404, 'Product not found');
+    }
+
+    // Check if product is in stock
+    if (!product.inStock || product.stock < quantity) {
+      throw new ApiError(400, 'Product is out of stock or insufficient quantity available');
+    }
+
+    // Find user and update cart
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    // Check if product already exists in cart
+    const existingCartItem = user.cart.find(
+      item => item.product.toString() === productId
+    );
+
+    if (existingCartItem) {
+      // Increase existing quantity by the requested amount
+      existingCartItem.quantity += quantity;
+    } else {
+      // Add new item to cart
+      user.cart.push({
+        product: productId,
+        quantity: quantity,
+      });
+    }
+
+    await user.save();
+
+    // Populate the cart items to return full product information
+    await user.populate({
+      path: 'cart.product',
+      select: 'name price image category inStock stock',
+    });
+
+    return successResponse(res, 200, 'Item added to cart successfully', {
+      cart: user.cart,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Remove item from cart
+ * @route   DELETE /api/cart/remove/:productId
+ * @access  Private (Customer)
+ */
+export const removeFromCart = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+
+    // Find user and update cart
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    // Filter out the product to remove it from cart
+    user.cart = user.cart.filter(
+      item => item.product.toString() !== productId
+    );
+
+    await user.save();
+
+    // Populate the cart items to return full product information
+    await user.populate({
+      path: 'cart.product',
+      select: 'name price image category inStock stock',
+    });
+
+    return successResponse(res, 200, 'Item removed from cart successfully', {
+      cart: user.cart,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Update cart item quantity
+ * @route   PUT /api/cart/update/:productId
+ * @access  Private (Customer)
+ */
+export const updateCartItemQuantity = async (req, res, next) => {
+  try {
+    const { productId } = req.params;
+    const { quantity } = req.body;
+
+    if (quantity <= 0) {
+      throw new ApiError(400, 'Quantity must be greater than 0');
+    }
+
+    // Find user and update cart
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    // Find the cart item
+    const cartItem = user.cart.find(
+      item => item.product.toString() === productId
+    );
+
+    if (!cartItem) {
+      throw new ApiError(404, 'Item not found in cart');
+    }
+
+    // Check if product exists
+    const product = await Product.findById(productId);
+    if (!product) {
+      throw new ApiError(404, 'Product not found');
+    }
+
+    // Check if product is in stock
+    if (!product.inStock || product.stock < quantity) {
+      throw new ApiError(400, 'Insufficient stock available');
+    }
+
+    // Update quantity
+    cartItem.quantity = quantity;
+
+    await user.save();
+
+    // Populate the cart items to return full product information
+    await user.populate({
+      path: 'cart.product',
+      select: 'name price image category inStock stock',
+    });
+
+    return successResponse(res, 200, 'Cart item updated successfully', {
+      cart: user.cart,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get user's cart
+ * @route   GET /api/cart
+ * @access  Private (Customer)
+ */
+export const getCart = async (req, res, next) => {
+  try {
+    // Find user and populate cart with product information
+    const user = await User.findById(req.user._id).populate({
+      path: 'cart.product',
+      select: 'name price image category inStock stock',
+    });
+
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    return successResponse(res, 200, 'Cart retrieved successfully', {
+      cart: user.cart,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Clear user's cart
+ * @route   DELETE /api/cart/clear
+ * @access  Private (Customer)
+ */
+export const clearCart = async (req, res, next) => {
+  try {
+    // Find user and clear cart
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { cart: [] } },
+      { new: true, runValidators: true }
+    ).populate({
+      path: 'cart.product',
+      select: 'name price image category inStock stock',
+    });
+
+    if (!user) {
+      throw new ApiError(404, 'User not found');
+    }
+
+    return successResponse(res, 200, 'Cart cleared successfully', {
+      cart: user.cart,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
