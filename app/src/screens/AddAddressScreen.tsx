@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import Toast from 'react-native-toast-message';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
+import addressService from '../services/addressService';
 
 const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, navigation }) => {
   const { colors, theme } = useTheme();
@@ -10,11 +12,12 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
   // Check if editing existing address
   const isEditing = route?.params?.addressData ? true : false;
   const existingAddress = route?.params?.addressData || {};
+  const [saving, setSaving] = useState(false);
   
   // State for address form
   const [addressForm, setAddressForm] = useState({
     name: existingAddress.name || '',
-    address: existingAddress.address || '',
+    address: existingAddress.address || existingAddress.addressLine || '',
     city: existingAddress.city || '',
     state: existingAddress.state || '',
     pincode: existingAddress.pincode || '',
@@ -48,18 +51,8 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
   };
 
   // Handle save address
-  const handleSaveAddress = () => {
+  const handleSaveAddress = async () => {
     // Validate inputs
-    if (!addressForm.name.trim()) {
-      Toast.show({
-        type: 'error',
-        text1: 'Validation Error',
-        text2: 'Please enter a name for this address',
-        visibilityTime: 2000,
-      });
-      return;
-    }
-
     if (!addressForm.address.trim()) {
       Toast.show({
         type: 'error',
@@ -100,7 +93,7 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
       return;
     }
 
-    if (!addressForm.phone.trim() || addressForm.phone.length !== 10) {
+    if (addressForm.phone && addressForm.phone.trim() && addressForm.phone.length !== 10) {
       Toast.show({
         type: 'error',
         text1: 'Validation Error',
@@ -110,27 +103,50 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
       return;
     }
 
-    // Show success message
-    Toast.show({
-      type: 'success',
-      text1: isEditing ? 'Address Updated' : 'Address Added',
-      text2: isEditing 
-        ? 'Your address has been updated successfully!' 
-        : 'Your new address has been saved successfully!',
-      visibilityTime: 2000,
-    });
+    try {
+      setSaving(true);
+      
+      const addressData = {
+        name: addressForm.name.trim() || undefined,
+        addressLine: addressForm.address.trim(),
+        city: addressForm.city.trim(),
+        state: addressForm.state.trim(),
+        pincode: addressForm.pincode.trim(),
+        phone: addressForm.phone.trim() || undefined,
+        type: addressForm.type,
+        isDefault: addressForm.isDefault,
+      };
 
-    // Navigate back to delivery address screen
-    if (isEditing) {
-      // Pass the updated address data back to the previous screen
-      navigation.navigate('DeliveryAddress', { 
-        updatedAddress: { 
-          ...addressForm, 
-          id: existingAddress.id 
-        } 
-      });
-    } else {
+      if (isEditing && existingAddress._id) {
+        await addressService.updateAddress(existingAddress._id, addressData);
+        Toast.show({
+          type: 'success',
+          text1: 'Address Updated',
+          text2: 'Your address has been updated successfully!',
+          visibilityTime: 2000,
+        });
+      } else {
+        await addressService.addAddress(addressData);
+        Toast.show({
+          type: 'success',
+          text1: 'Address Added',
+          text2: 'Your new address has been saved successfully!',
+          visibilityTime: 2000,
+        });
+      }
+
+      // Navigate back to delivery address screen
       navigation.goBack();
+    } catch (error: any) {
+      console.error('Error saving address:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to save address',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -149,19 +165,22 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
         >
           <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Logo size={30} style={styles.headerLogo} />
         <Text style={[styles.headerTitle, { color: colors.text }]}>{screenTitle}</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
       <Text style={[styles.title, { color: colors.text }]}>{screenTitle}</Text>
 
       <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
         <View style={[styles.inputGroup, { backgroundColor: colors.surface, elevation: 2 }]}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Full Name *</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Address Name (Optional)</Text>
           <TextInput
             style={[styles.input, { color: colors.text, backgroundColor: colors.surface }]}
             value={addressForm.name}
             onChangeText={(text) => handleInputChange('name', text)}
-            placeholder="Enter your full name"
+            placeholder="e.g., Home, Office, Work"
             placeholderTextColor={colors.textSecondary}
           />
 
@@ -205,7 +224,7 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
             maxLength={6}
           />
 
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 15 }]}>Phone Number *</Text>
+          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 15 }]}>Phone Number (Optional)</Text>
           <TextInput
             style={[styles.input, { color: colors.text, backgroundColor: colors.surface }]}
             value={addressForm.phone}
@@ -272,12 +291,25 @@ const AddAddressScreen: React.FC<{ route: any, navigation: any }> = ({ route, na
       </ScrollView>
 
       {/* Save Button */}
-      <TouchableOpacity 
-        style={[styles.saveButton, { backgroundColor: colors.primary }]}
-        onPress={handleSaveAddress}
-      >
-        <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>{buttonText}</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity 
+          style={[
+            styles.saveButton, 
+            { 
+              backgroundColor: saving ? colors.textSecondary : colors.primary,
+              opacity: saving ? 0.7 : 1
+            }
+          ]}
+          onPress={handleSaveAddress}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color={colors.onPrimary} />
+          ) : (
+            <Text style={[styles.saveButtonText, { color: colors.onPrimary }]}>{buttonText}</Text>
+          )}
+        </TouchableOpacity>
+      </View>
       </View>
     </ThemedLayout>
   );
@@ -357,6 +389,9 @@ const styles = StyleSheet.create({
   defaultOptionText: {
     fontSize: 16,
   },
+  buttonContainer: {
+    paddingBottom: 90, // Extra padding for bottom navigation bar
+  },
   saveButton: {
     padding: 15,
     borderRadius: 10,
@@ -380,6 +415,15 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerLogo: {
+    marginRight: 8,
   },
   headerTitle: {
     flex: 1,

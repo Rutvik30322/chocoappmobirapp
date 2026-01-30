@@ -298,7 +298,7 @@ const handleLogin = async () => {
       password: password,
     });
     
-    console.log('Login successful:', response.data.user);
+   
     // Navigate to home screen
   } catch (error) {
     console.error('Login error:', error);

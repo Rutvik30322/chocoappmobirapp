@@ -9,53 +9,52 @@ export const protect = async (req, res, next) => {
     let token;
 
     // Debug logging
-    console.log('Authorization header received:', req.headers.authorization);
-    console.log('Full headers:', req.headers);
-
+   
     // Get token from header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
 
     if (!token) {
-      console.log('No token found in authorization header');
       return errorResponse(res, 401, 'Not authorized, no token');
     }
 
-    console.log('Token found, proceeding with verification');
 
     // Verify token
     const decoded = verifyToken(token);
-    console.log('Decoded token:', decoded);
 
-    // Check if user or admin
-    if (decoded.role === 'admin') {
+    // Check if user or admin (including superadmin)
+    if (decoded.role === 'admin' || decoded.role === 'superadmin') {
       req.admin = await Admin.findById(decoded.id).select('-password');
       if (!req.admin) {
         return errorResponse(res, 401, 'Admin not found');
       }
-      console.log('Admin authenticated:', req.admin.name);
+      req.role = req.admin.role; // Use role from database, not token
     } else {
       req.user = await User.findById(decoded.id).select('-password');
       if (!req.user) {
         return errorResponse(res, 401, 'User not found');
       }
-      console.log('User authenticated:', req.user.name);
+      req.role = decoded.role;
     }
-
-    req.role = decoded.role;
-    console.log('Role assigned:', req.role);
     next();
   } catch (error) {
-    console.log('Authentication error:', error.message);
     return errorResponse(res, 401, error.message || 'Not authorized');
   }
 };
 
 // Admin only middleware
 export const adminOnly = (req, res, next) => {
-  if (req.role !== 'admin') {
+  if (req.role !== 'admin' && req.role !== 'superadmin') {
     return errorResponse(res, 403, 'Access denied. Admin only.');
+  }
+  next();
+};
+
+// Super admin only middleware
+export const superAdminOnly = (req, res, next) => {
+  if (req.role !== 'superadmin') {
+    return errorResponse(res, 403, 'Access denied. Super admin only.');
   }
   next();
 };

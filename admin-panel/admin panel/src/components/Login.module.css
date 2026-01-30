@@ -140,6 +140,16 @@
   font-size: 0.9rem;
 }
 
+.successMessage {
+  background-color: #10b981;
+  color: white;
+  padding: 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  border-left: 4px solid #059669;
+  font-size: 0.9rem;
+}
+
 /* Responsive Login */
 @media (max-width: 768px) {
   .loginContainer {

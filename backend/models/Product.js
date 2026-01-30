@@ -29,7 +29,7 @@ const productSchema = new mongoose.Schema(
     category: {
       type: String,
       required: [true, 'Please provide product category'],
-      enum: ['Bars', 'Truffles', 'Fudge', 'Pralines', 'Fruits', 'Caramels', 'Flavored'],
+      trim: true,
     },
     rating: {
       type: Number,

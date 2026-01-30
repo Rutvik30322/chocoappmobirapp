@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
 
 const SplashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { colors, theme } = useTheme();
@@ -21,11 +22,11 @@ const SplashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <View style={styles.content}>
         {/* App Logo/Icon */}
         <View style={[styles.logoContainer, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.logoText, { color: colors.primary }]}>🍫</Text>
+          <Logo size={100} />
         </View>
         
         {/* App Title */}
-        <Text style={[styles.title, { color: colors.text }]}>ChocoDelight</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Cremio Chocolate</Text>
         
         {/* Tagline */}
         <Text style={[styles.tagline, { color: colors.textSecondary }]}>
@@ -74,9 +75,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-  },
-  logoText: {
-    fontSize: 60,
+    overflow: 'hidden',
   },
   title: {
     fontSize: 32,

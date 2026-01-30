@@ -1,4 +1,4 @@
-package com.mobileapp
+package com.cremio
 
 import android.app.Application
 import com.facebook.react.PackageList

@@ -20,17 +20,17 @@ interface ThemeContextType {
 }
 
 const lightColors = {
-  primary: '#6B46C1', // Purple
-  secondary: '#F59E0B', // Amber
-  background: '#F9FAFB', // Light gray
-  surface: '#FFFFFF', // White
-  text: '#1F2937', // Dark gray
-  textSecondary: '#6B7280', // Medium gray
-  error: '#EF4444', // Red
-  onPrimary: '#FFFFFF',
-  onSecondary: '#FFFFFF',
-  onBackground: '#1F2937',
-  onSurface: '#1F2937',
+  primary: '#8B4513', // Dark chocolate brown
+  secondary: '#D4AF37', // Gold/amber accent
+  background: '#FFF8F0', // Cream/beige background
+  surface: '#FFFFFF', // White surface
+  text: '#3E2723', // Dark brown text
+  textSecondary: '#6D4C41', // Medium brown text
+  error: '#D32F2F', // Red for errors
+  onPrimary: '#FFFFFF', // White text on primary
+  onSecondary: '#FFFFFF', // White text on secondary
+  onBackground: '#3E2723', // Dark text on background
+  onSurface: '#3E2723', // Dark text on surface
 };
 
 const darkColors = {

@@ -9,21 +9,39 @@ const seedData = async () => {
   try {
     await connectDB();
 
-    console.log('🌱 Seeding data...');
+    
 
     // Create admin user if not exists
-    const adminExists = await Admin.findOne({ email: process.env.ADMIN_EMAIL || 'admin@chocolateapp.com' });
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@chocolateapp.com';
+    const adminMobile = process.env.ADMIN_MOBILE || null;
+    const adminExists = await Admin.findOne({ email: adminEmail });
 
     if (!adminExists) {
-      await Admin.create({
+      const adminData = {
         name: 'Admin User',
-        email: process.env.ADMIN_EMAIL || 'admin@chocolateapp.com',
+        email: adminEmail,
         password: process.env.ADMIN_PASSWORD || 'Admin@123456',
         role: 'superadmin',
-      });
-      console.log('✅ Admin user created');
+      };
+
+      // Add mobile if provided
+      if (adminMobile && /^[0-9]{10}$/.test(adminMobile)) {
+        adminData.mobile = adminMobile;
+      }
+
+      await Admin.create(adminData);
+    
+      if (adminMobile) {
+        
+      }
     } else {
-      console.log('ℹ️  Admin user already exists');
+     
+      // Update mobile if provided and not already set
+      if (adminMobile && /^[0-9]{10}$/.test(adminMobile) && !adminExists.mobile) {
+        adminExists.mobile = adminMobile;
+        await adminExists.save();
+      
+      }
     }
 
     // Seed products if database is empty
@@ -130,12 +148,12 @@ const seedData = async () => {
       ];
 
       await Product.insertMany(products);
-      console.log('✅ Products seeded successfully');
+     
     } else {
-      console.log('ℹ️  Products already exist');
+     
     }
 
-    console.log('✅ Seeding completed successfully');
+    
     process.exit(0);
   } catch (error) {
     console.error('❌ Seeding error:', error.message);

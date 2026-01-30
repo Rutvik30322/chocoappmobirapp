@@ -38,16 +38,12 @@ const initialState: AuthState = {
 export const register = createAsyncThunk(
   'auth/register',
   async (userData: RegisterData, { rejectWithValue }) => {
-    console.log('🔵 Redux: register action called with:', userData);
     try {
       const response = await authService.register(userData);
-      console.log('✅ Redux: register success, response:', response);
       return response.data; // response.data is { user, token } after interceptor
     } catch (error: any) {
-      console.log('❌ Redux: register error:', error);
       // Error from axios interceptor: error.response.data or error.message
       const errorMessage = error?.message || error?.error || 'Registration failed';
-      console.log('❌ Redux: Returning error message:', errorMessage);
       return rejectWithValue(errorMessage);
     }
   }
@@ -104,7 +100,7 @@ export const loadUser = createAsyncThunk(
 // Update profile
 export const updateProfile = createAsyncThunk(
   'auth/updateProfile',
-  async (data: { name?: string; email?: string; mobile?: string }, { rejectWithValue }) => {
+  async (data: { name?: string; email?: string; mobile?: string; profilePicture?: string }, { rejectWithValue }) => {
     try {
       const response = await authService.updateProfile(data);
       return response.data;

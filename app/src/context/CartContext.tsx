@@ -9,6 +9,8 @@ interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  stock?: number;
+  inStock?: boolean;
 }
 
 interface CartContextType {
@@ -67,13 +69,17 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
       const response = await cartService.getCart();
       if (response.data && response.data.cart) {
         // Convert backend cart items to local cart format
-        const localCartItems = response.data.cart.map((item: any) => ({
-
+        // Filter out items with null products (deleted products)
+        const localCartItems = response.data.cart
+          .filter((item: any) => item.product && item.product._id) // Filter out null products
+          .map((item: any) => ({
           id: item.product._id,
           name: item.product.name,
           price: item.product.price,
           quantity: item.quantity,
           image: item.product.image,
+          stock: item.product.stock,
+          inStock: item.product.inStock,
         }));
         
         setItems(localCartItems);
@@ -150,8 +156,8 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
   }, [userId]);
 
   const updateQuantity = React.useCallback(async (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(id);
+    // Don't allow quantity to go below 1
+    if (quantity < 1) {
       return;
     }
     
@@ -171,7 +177,7 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         );
       }
     }
-  }, [removeFromCart, userId]);
+  }, [userId]);
 
   const clearCart = React.useCallback(async () => {
     setItems([]);
@@ -180,9 +186,13 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     if (userId) {
       try {
         await cartService.clearCart();
-      } catch (error) {
-        console.error('Failed to clear backend cart:', error);
-        // Revert the local change if backend sync fails
+      } catch (error: any) {
+        // Silently handle errors - don't log to console during normal operations
+        // This prevents error messages during logout when token might be invalid
+        // Only log in development mode for debugging
+        if (__DEV__) {
+          console.log('Note: Backend cart clearing failed (this may be expected during logout):', error?.message || 'Unknown error');
+        }
         // We won't revert as clearing is usually intentional
       }
     }

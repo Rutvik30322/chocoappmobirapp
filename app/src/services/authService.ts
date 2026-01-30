@@ -1,5 +1,6 @@
 import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export interface RegisterData {
   name: string;
@@ -22,21 +23,19 @@ export interface AdminLoginData {
 class AuthService {
   // Register new user
   async register(data: RegisterData) {
-    console.log('📝 AuthService: Starting registration with data:', data);
+   
     try {
       const response = await api.post('/auth/register', data);
-      console.log('✅ AuthService: Registration API response:', response);
+    
       // response is the unwrapped backend response
       // response structure: { success, message, data: { user, token } }
       // so response.data = { user, token }
       if (response.data && response.data.token) {
         await AsyncStorage.setItem('token', response.data.token);
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
-        console.log('✅ AuthService: Token and user saved to storage');
       }
       return response;
     } catch (error) {
-      console.log('❌ AuthService: Registration error:', error);
       throw error;
     }
   }
@@ -76,7 +75,7 @@ class AuthService {
   }
 
   // Update profile
-  async updateProfile(data: { name?: string; email?: string; mobile?: string }) {
+  async updateProfile(data: { name?: string; email?: string; mobile?: string; profilePicture?: string }) {
     const response = await api.put('/auth/profile', data);
     // response is the unwrapped backend response
     // response structure: { success, message, data: { user } }
@@ -98,11 +97,22 @@ class AuthService {
 
   // Upload profile picture
   async uploadProfilePicture(imageUri: string) {
+    // Check if it's a URL or a local file path
+    if (imageUri.startsWith('http://') || imageUri.startsWith('https://')) {
+      // If it's already a URL (e.g., Cloudinary URL), update profile directly
+      return await this.updateProfile({ profilePicture: imageUri });
+    }
+    
+    // Otherwise, upload as file to Cloudinary
     const formData = new FormData();
+    const filename = imageUri.split('/').pop() || 'profile.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+    
     formData.append('profilePicture', {
-      uri: imageUri,
-      type: 'image/jpeg',
-      name: 'profile.jpg',
+      uri: Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri,
+      type: type,
+      name: filename,
     } as any);
 
     const response = await api.post('/upload/profile-picture', formData, {
@@ -134,6 +144,24 @@ class AuthService {
   // Get user role
   async getUserRole() {
     return await AsyncStorage.getItem('userRole');
+  }
+
+  // Forgot Password - Send OTP
+  async sendOtp(mobile: string) {
+    const response = await api.post('/auth/forgot-password/send-otp', { mobile });
+    return response;
+  }
+
+  // Forgot Password - Verify OTP
+  async verifyOtp(mobile: string, otp: string) {
+    const response = await api.post('/auth/forgot-password/verify-otp', { mobile, otp });
+    return response;
+  }
+
+  // Forgot Password - Reset Password
+  async resetPassword(mobile: string, otp: string, newPassword: string) {
+    const response = await api.post('/auth/forgot-password/reset', { mobile, otp, newPassword });
+    return response;
   }
 }
 

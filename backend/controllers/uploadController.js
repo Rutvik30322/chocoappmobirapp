@@ -18,9 +18,6 @@ export const uploadProfilePicture = async (req, res, next) => {
 
     const imageUrl = req.file.path; // Cloudinary URL
     
-    // Log the generated Cloudinary URL
-    console.log('Generated Cloudinary profile image URL:', imageUrl);
-    
     // Update user or admin profile picture
     if (req.role === 'admin') {
       const admin = await Admin.findById(req.admin._id);
@@ -102,25 +99,16 @@ export const deleteProfilePicture = async (req, res, next) => {
  */
 export const uploadProductImages = async (req, res, next) => {
   try {
-    console.log('UploadProductImages called');
-    console.log('User/Admin role:', req.role);
-    console.log('Admin/User details:', req.admin || req.user);
-    console.log('Files received:', req.files ? req.files.length : 0);
-    
     if (!req.files || req.files.length === 0) {
       throw new ApiError(400, 'Please upload at least one image file');
     }
 
     const imageUrls = req.files.map(file => file.path); // Cloudinary URLs
     
-    // Log the generated Cloudinary URLs
-    console.log('Generated Cloudinary image URLs:', imageUrls);
-
     return successResponse(res, 200, 'Product images uploaded successfully', {
       imageUrls,
     });
   } catch (error) {
-    console.log('Upload error:', error.message);
     next(error);
   }
 };

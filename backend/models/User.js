@@ -39,10 +39,41 @@ const userSchema = new mongoose.Schema(
     },
     addresses: [
       {
-        addressLine: String,
-        city: String,
-        state: String,
-        pincode: String,
+        name: {
+          type: String,
+          trim: true,
+        },
+        addressLine: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        city: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        state: {
+          type: String,
+          required: true,
+          trim: true,
+        },
+        pincode: {
+          type: String,
+          required: true,
+          trim: true,
+          match: [/^[0-9]{6}$/, 'Pincode must be 6 digits'],
+        },
+        phone: {
+          type: String,
+          trim: true,
+          match: [/^[0-9]{10}$/, 'Phone must be 10 digits'],
+        },
+        type: {
+          type: String,
+          enum: ['Home', 'Office', 'Other'],
+          default: 'Home',
+        },
         isDefault: {
           type: Boolean,
           default: false,
@@ -52,7 +83,7 @@ const userSchema = new mongoose.Schema(
     role: {
       type: String,
       default: 'customer',
-      enum: ['customer'],
+      enum: ['customer', 'admin'],
     },
     isActive: {
       type: Boolean,

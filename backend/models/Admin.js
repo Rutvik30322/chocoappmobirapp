@@ -19,6 +19,13 @@ const adminSchema = new mongoose.Schema(
         'Please provide a valid email',
       ],
     },
+    mobile: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow null values but ensure uniqueness when present
+      trim: true,
+      match: [/^[0-9]{10}$/, 'Please provide a valid 10-digit mobile number'],
+    },
     password: {
       type: String,
       required: [true, 'Please provide a password'],

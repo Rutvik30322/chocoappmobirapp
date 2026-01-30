@@ -44,8 +44,18 @@ A comprehensive Node.js + Express + MongoDB REST API for the Chocolate App with 
    PORT=5000
    NODE_ENV=development
    
-   # MongoDB Atlas
-   MONGODB_URI=your_mongodb_atlas_connection_string
+   # MongoDB Connection - Choose ONE option:
+   # OPTION 1: MongoDB Atlas (Cloud)
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/chocolateapp?retryWrites=true&w=majority
+   
+   # OPTION 2: MongoDB Local (Uncomment and use this for local MongoDB)
+   # MONGODB_URI=mongodb://localhost:27017/chocolateapp
+   # OR
+   # MONGODB_URI=mongodb://127.0.0.1:27017/chocolateapp
+   
+   # SambaNova AI (Optional - for AI-powered category extraction from PDF)
+   # Uses DeepSeek-R1-0528 model for intelligent category analysis
+   SAMBANOVA_AI_API_KEY=your_sambanova_ai_api_key_here
    
    # JWT
    JWT_SECRET=your_super_secret_key
@@ -94,6 +104,19 @@ A comprehensive Node.js + Express + MongoDB REST API for the Chocolate App with 
 | POST | `/` | Create new product | Private (Admin) |
 | PUT | `/:id` | Update product | Private (Admin) |
 | DELETE | `/:id` | Delete product | Private (Admin) |
+
+### Categories (`/api/categories`)
+
+| Method | Endpoint | Description | Access |
+|--------|----------|-------------|--------|
+| GET | `/` | Get all categories | Public |
+| GET | `/:id` | Get category by ID | Public |
+| POST | `/` | Create new category | Private (Admin) |
+| POST | `/parse-pdf` | Parse PDF and extract categories using AI | Private (Admin) |
+| PUT | `/:id` | Update category | Private (Admin) |
+| DELETE | `/:id` | Delete category | Private (Admin) |
+
+**Note:** The `/parse-pdf` endpoint uses SambaNova AI (DeepSeek-R1-0528) to intelligently analyze product names from a PDF and suggest appropriate category names. If `SAMBANOVA_AI_API_KEY` is not set, it will fall back to keyword-based category extraction.
 
 ### Orders (`/api/orders`)
 

@@ -62,8 +62,11 @@ export const addToCart = async (req, res, next) => {
       select: 'name price image category inStock stock',
     });
 
+    // Filter out any null products (shouldn't happen, but safety check)
+    const validCartItems = user.cart.filter(item => item.product !== null && item.product !== undefined);
+
     return successResponse(res, 200, 'Item added to cart successfully', {
-      cart: user.cart,
+      cart: validCartItems,
     });
   } catch (error) {
     next(error);
@@ -157,8 +160,17 @@ export const updateCartItemQuantity = async (req, res, next) => {
       select: 'name price image category inStock stock',
     });
 
+    // Filter out any null products (deleted products)
+    const validCartItems = user.cart.filter(item => item.product !== null && item.product !== undefined);
+    
+    // Update user's cart if there were invalid items
+    if (validCartItems.length !== user.cart.length) {
+      user.cart = validCartItems;
+      await user.save();
+    }
+
     return successResponse(res, 200, 'Cart item updated successfully', {
-      cart: user.cart,
+      cart: validCartItems,
     });
   } catch (error) {
     next(error);
@@ -182,8 +194,17 @@ export const getCart = async (req, res, next) => {
       throw new ApiError(404, 'User not found');
     }
 
+    // Filter out cart items where product is null (deleted products)
+    const validCartItems = user.cart.filter(item => item.product !== null && item.product !== undefined);
+    
+    // If there were invalid items, update the user's cart
+    if (validCartItems.length !== user.cart.length) {
+      user.cart = validCartItems;
+      await user.save();
+    }
+
     return successResponse(res, 200, 'Cart retrieved successfully', {
-      cart: user.cart,
+      cart: validCartItems,
     });
   } catch (error) {
     next(error);

@@ -24,7 +24,7 @@ export interface ProductFilters {
   inStock?: boolean;
   sort?: string;
   page?: number;
-  limit?: number;
+  limit?: number | string; // Allow 'all' string or number
 }
 
 class ProductService {
@@ -48,9 +48,9 @@ class ProductService {
     return response;
   }
 
-  // Get categories
+  // Get categories (using new categories endpoint)
   async getCategories() {
-    const response = await api.get('/products/categories/all');
+    const response = await api.get('/categories?active=true');
     return response;
   }
 
@@ -70,6 +70,45 @@ class ProductService {
   async deleteProduct(id: string) {
     const response = await api.delete(`/products/${id}`);
     return response;
+  }
+
+  // Get related products (same category, exclude current product)
+  async getRelatedProducts(category: string, excludeProductId: string, limit: number = 4) {
+  
+    
+    // Encode category to handle special characters
+    const encodedCategory = encodeURIComponent(category);
+    const response = await api.get(`/products?category=${encodedCategory}&limit=${limit + 1}&page=1`);
+    
+    
+    // API interceptor returns response.data directly
+    // Backend returns: { success, statusCode, message, data: { products: [...], pagination: {...} } }
+    // So response structure is: { success, statusCode, message, data: { products: [...], pagination: {...} } }
+    let products = [];
+    
+    if (response?.data?.products) {
+      products = response.data.products;
+    } else if (response?.data?.data?.products) {
+      products = response.data.data.products;
+    } else if (response?.products) {
+      products = response.products;
+    }
+    
+    
+    // Filter out the current product
+    const related = products.filter((p: Product) => {
+      const isNotExcluded = p._id !== excludeProductId;
+      return isNotExcluded;
+    });
+    
+    
+    return { 
+      ...response, 
+      data: { 
+        ...response.data, 
+        products: related.slice(0, limit) 
+      } 
+    };
   }
 }
 

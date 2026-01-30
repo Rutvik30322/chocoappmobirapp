@@ -4,19 +4,32 @@ import { productService } from '../../services/api';
 // Async thunk for fetching all products
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await productService.getAllProducts();
+      const response = await productService.getAllProducts(params);
       
       // Handle response structure: { success, message, data: { products, pagination } }
-      if (response.data && response.data.data && Array.isArray(response.data.data.products)) {
-        return response.data.data.products;
-      } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-        // Fallback for different response structure
-        return response.data.data;
-      } else {
-        return [];
+      if (response.data && response.data.data) {
+        if (response.data.data.products && response.data.data.pagination) {
+          // New structure with pagination
+          return {
+            products: response.data.data.products || [],
+            pagination: response.data.data.pagination || { page: 1, pages: 1, total: 0 }
+          };
+        } else if (Array.isArray(response.data.data.products)) {
+          return {
+            products: response.data.data.products,
+            pagination: response.data.data.pagination || { page: 1, pages: 1, total: 0 }
+          };
+        } else if (Array.isArray(response.data.data)) {
+          // Fallback for different response structure
+          return {
+            products: response.data.data,
+            pagination: { page: 1, pages: 1, total: response.data.data.length }
+          };
+        }
       }
+      return { products: [], pagination: { page: 1, pages: 1, total: 0 } };
     } catch (error) {
       console.error('Error fetching products:', error);
       return rejectWithValue(error.response?.data?.message || error.message);
@@ -28,9 +41,10 @@ export const fetchProducts = createAsyncThunk(
 export const createProduct = createAsyncThunk(
   'products/createProduct',
   async (productData, { rejectWithValue }) => {
+   
     try {
       const response = await productService.createProduct(productData);
-      console.log('Create product response:', response.data.data.product);
+     
       return response.data.data.product;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
@@ -42,9 +56,10 @@ export const createProduct = createAsyncThunk(
 export const updateProduct = createAsyncThunk(
   'products/updateProduct',
   async ({ id, productData }, { rejectWithValue }) => {
+   
     try {
       const response = await productService.updateProduct(id, productData);
-      console.log('Update product response:', response.data.data.product);
+    
       return response.data.data.product;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
@@ -72,6 +87,19 @@ const productSlice = createSlice({
     loading: false,
     error: null,
     currentProduct: null,
+    pagination: {
+      total: 0,
+      page: 1,
+      pages: 1,
+    },
+    currentFilter: {
+      search: '',
+      category: '',
+      inStock: '',
+      sort: 'newest',
+      page: 1,
+      limit: 10,
+    }
   },
   reducers: {
     setCurrentProduct: (state, action) => {
@@ -80,6 +108,16 @@ const productSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    setCurrentFilter: (state, action) => {
+      state.currentFilter = { ...state.currentFilter, ...action.payload };
+    },
+    resetPagination: (state) => {
+      state.pagination = {
+        total: 0,
+        page: 1,
+        pages: 1,
+      };
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -90,7 +128,13 @@ const productSlice = createSlice({
       })
       .addCase(fetchProducts.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload;
+        if (action.payload.products) {
+          state.items = action.payload.products;
+          state.pagination = action.payload.pagination || { page: 1, pages: 1, total: 0 };
+        } else {
+          // Fallback for old structure
+          state.items = Array.isArray(action.payload) ? action.payload : [];
+        }
       })
       .addCase(fetchProducts.rejected, (state, action) => {
         state.loading = false;
@@ -142,5 +186,5 @@ const productSlice = createSlice({
   },
 });
 
-export const { setCurrentProduct, clearError } = productSlice.actions;
+export const { setCurrentProduct, clearError, setCurrentFilter, resetPagination } = productSlice.actions;
 export default productSlice.reducer;

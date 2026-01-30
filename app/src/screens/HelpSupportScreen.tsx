@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ThemedLayout from '../components/ThemedLayout';
 
-const HelpSupportScreen: React.FC = () => {
+const HelpSupportScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { colors, theme } = useTheme();
 
   const handleContactSupport = () => {
@@ -24,9 +24,25 @@ const HelpSupportScreen: React.FC = () => {
   };
 
   return (
-    <ThemedLayout>
+    <ThemedLayout edges={['top']}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>Help & Support</Text>
+      {/* Header with back button */}
+      <View style={[styles.header, { backgroundColor: colors.surface }]}>        
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation?.goBack()}
+        >
+          <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Help & Support</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>Contact Us</Text>
@@ -92,6 +108,7 @@ const HelpSupportScreen: React.FC = () => {
         <Text style={[styles.contactText, { color: colors.text }]}>Saturday: 10:00 AM - 4:00 PM</Text>
         <Text style={[styles.contactText, { color: colors.text }]}>Sunday: Closed</Text>
       </View>
+      </ScrollView>
     </View>
     </ThemedLayout>
   );
@@ -100,7 +117,37 @@ const HelpSupportScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 10,
+  },
+  backButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   title: {
     fontSize: 24,

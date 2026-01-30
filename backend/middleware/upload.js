@@ -41,6 +41,16 @@ const upload = multer({
   },
 });
 
+// Configure Cloudinary Storage for Banner Images
+const bannerImageStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'chocolate-app/banners',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 1200, height: 400, crop: 'limit' }],
+  },
+});
+
 // Multer upload configuration for multiple product images
 const productImageUpload = multer({
   storage: productImageStorage,
@@ -51,8 +61,37 @@ const productImageUpload = multer({
   },
 });
 
+// Multer upload configuration for banner images
+const bannerImageUpload = multer({
+  storage: bannerImageStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max file size
+  },
+});
+
+// Multer configuration for PDF files (memory storage for parsing)
+const pdfStorage = multer.memoryStorage();
+
+const pdfFileFilter = (req, file, cb) => {
+  // Accept PDF files only
+  if (file.mimetype === 'application/pdf') {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF files are allowed!'), false);
+  }
+};
+
+const pdfUpload = multer({
+  storage: pdfStorage,
+  fileFilter: pdfFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max file size for PDFs
+  },
+});
+
 // Export both configurations
 export default upload;
 
 // Export product image upload
-export { productImageUpload };
+export { productImageUpload, bannerImageUpload, pdfUpload };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
 
 const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { colors, theme } = useTheme();
@@ -31,7 +32,10 @@ const NotificationsScreen: React.FC<{ navigation?: any }> = ({ navigation }) => 
         >
           <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Logo size={30} style={styles.headerLogo} />
         <Text style={[styles.headerTitle, { color: colors.text }]}>Notifications</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
       <Text style={[styles.title, { color: colors.text }]}>Notification Settings</Text>
@@ -168,6 +172,15 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerLogo: {
+    marginRight: 8,
   },
   headerTitle: {
     flex: 1,

@@ -8,7 +8,7 @@ const createAdmin = async () => {
   try {
     await connectDB();
 
-    const { name, email, password } = process.argv.slice(2).reduce((acc, arg, index, arr) => {
+    const { name, email, mobile, password } = process.argv.slice(2).reduce((acc, arg, index, arr) => {
       if (arg.startsWith('--')) {
         const nextValue = arr[index + 1];
         if (nextValue && !nextValue.startsWith('--')) {
@@ -19,30 +19,45 @@ const createAdmin = async () => {
     }, {});
 
     if (!name || !email || !password) {
-      console.log('Usage: node create-admin.js --name "Admin Name" --email "admin@example.com" --password "SecurePassword123"');
+    
+      process.exit(1);
+    }
+
+    // Validate mobile format if provided
+    if (mobile && !/^[0-9]{10}$/.test(mobile)) {
+    
       process.exit(1);
     }
 
     // Check if admin already exists
-    const existingAdmin = await Admin.findOne({ email });
+    const existingAdmin = await Admin.findOne({ 
+      $or: [{ email }, ...(mobile ? [{ mobile }] : [])]
+    });
     
     if (existingAdmin) {
-      console.log(`❌ Admin with email ${email} already exists`);
+      console.error(`❌ Admin with email ${email}${mobile ? ` or mobile ${mobile}` : ''} already exists`);
       process.exit(1);
     }
 
     // Create new admin
-    const admin = await Admin.create({
+    const adminData = {
       name,
       email,
       password,
       role: 'admin', // Default role, can be 'admin' or 'superadmin'
-    });
+    };
 
-    console.log(`✅ Admin user created successfully!`);
-    console.log(`Name: ${admin.name}`);
-    console.log(`Email: ${admin.email}`);
-    console.log(`Role: ${admin.role}`);
+    if (mobile) {
+      adminData.mobile = mobile;
+    }
+
+    const admin = await Admin.create(adminData);
+
+    
+    if (admin.mobile) {
+     
+    }
+  
 
     process.exit(0);
   } catch (error) {

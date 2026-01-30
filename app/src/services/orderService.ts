@@ -59,6 +59,12 @@ class OrderService {
     return response;
   }
 
+  // Cancel order (Customer)
+  async cancelOrder(id: string) {
+    const response = await api.put(`/orders/${id}/cancel`);
+    return response;
+  }
+
   // Update order status (Admin only)
   async updateOrderStatus(id: string, orderStatus: string) {
     const response = await api.put(`/orders/${id}/status`, { orderStatus });

@@ -1,228 +1,224 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from '../store/slices/productSlice';
-import { uploadService } from '../services/api';
-import { adminLogout } from '../store/slices/authSlice';
+import { fetchProducts, deleteProduct, setCurrentFilter } from '../store/slices/productSlice';
+import { fetchCategories } from '../store/slices/categorySlice';
+import Sidebar from './Sidebar';
+import Header from './Header';
+import LoadingOverlay from './LoadingOverlay';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 import styles from './Products.module.css';
 
 const Products = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { items: products, loading, error } = useSelector(state => state.products);
-  const [showForm, setShowForm] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: '',
-    rating: '',
-    inStock: true,
-    stock: '',
-    weight: '',
-    ingredients: '',
-    image: '',
-    images: []
+  const { items: products, loading, error, pagination, currentFilter } = useSelector(state => state.products);
+  const { items: categories } = useSelector(state => state.categories);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState(null);
+  const [actionLoading, setActionLoading] = useState({
+    delete: false,
+    pagination: false,
   });
+
+  // Get unique categories from products for filter dropdown (fallback)
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
   
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
-    { name: 'Products', path: '/products', icon: '📦' },
-    { name: 'Orders', path: '/orders', icon: '📋' },
-    { name: 'Customers', path: '/customers', icon: '👥' },
-    { name: 'Categories', path: '/categories', icon: '🏷️' },
-    { name: 'Analytics', path: '/analytics', icon: '📊' },
-  ];
+  // Use all categories from store for filter dropdown (includes categories without products)
+  const allCategories = Array.isArray(categories) ? categories : [];
+  const categoryNames = allCategories.length > 0 
+    ? allCategories.map(cat => cat.name).filter(Boolean)
+    : uniqueCategories; // Fallback to uniqueCategories if categories not loaded yet
 
   useEffect(() => {
-    dispatch(fetchProducts());
+    // Fetch all categories (both active and inactive) for the filter dropdown
+    dispatch(fetchCategories(false));
   }, [dispatch]);
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    // Skip updating the image field since it's now controlled by file upload only
-    if (name === 'image') return;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Log the image URLs being sent to the backend
-    console.log('Submitting product data with image URLs:', {
-      image: formData.image,
-      images: formData.images
-    });
-    
-    try {
-      if (editingProduct) {
-        // Update existing product
-        await dispatch(updateProduct({ id: editingProduct._id, productData: formData }));
-      } else {
-        // Create new product
-        await dispatch(createProduct(formData));
-      }
-
-      // Reset form and close form
-      setFormData({
-        name: '',
-        description: '',
-        price: '',
-        category: '',
-        rating: '',
-        inStock: true,
-        stock: '',
-        weight: '',
-        ingredients: '',
-        image: '',
-        images: []
-      });
-      setEditingProduct(null);
-      setShowForm(false);
-    } catch (error) {
-      console.error('Error saving product:', error);
-    }
-  };
+  useEffect(() => {
+    dispatch(fetchProducts(currentFilter));
+  }, [dispatch, currentFilter]);
 
   const handleEdit = (product) => {
     if (!product) return;
-    console.log('Loading product for edit:', {
-      productId: product._id,
-      productName: product.name,
-      productImage: product.image,
-      productImages: product.images
-    });
-    setEditingProduct(product);
-    setFormData({
-      name: product.name || '',
-      description: product.description || '',
-      price: product.price || '',
-      category: product.category || '',
-      rating: product.rating || '',
-      inStock: typeof product.inStock !== 'undefined' ? product.inStock : true,
-      stock: product.stock || '',
-      weight: product.weight || '',
-      ingredients: Array.isArray(product.ingredients) ? product.ingredients.join(', ') : (product.ingredients || ''),
-      image: product.image || '',
-      images: Array.isArray(product.images) ? [...product.images] : []
-    });
-    setShowForm(true);
+    navigate(`/products/edit/${product._id}`);
   };
 
-  const handleDelete = async (productId) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+  const handleDelete = (product) => {
+    setProductToDelete(product);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (productToDelete) {
       try {
-        await dispatch(deleteProduct(productId));
+        setActionLoading(prev => ({ ...prev, delete: true }));
+        await dispatch(deleteProduct(productToDelete._id));
+        // Refresh products after deletion
+        await dispatch(fetchProducts(currentFilter));
+        setShowDeleteModal(false);
+        setProductToDelete(null);
       } catch (error) {
         console.error('Error deleting product:', error);
+        alert('Failed to delete product: ' + (error?.message || 'Unknown error'));
+      } finally {
+        setActionLoading(prev => ({ ...prev, delete: false }));
       }
     }
   };
 
-  const handleCancel = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      category: '',
-      rating: '',
-      inStock: true,
-      stock: '',
-      weight: '',
-      ingredients: '',
-      image: '',
-      images: []
-    });
-    setEditingProduct(null);
-    setShowForm(false);
+  const cancelDelete = () => {
+    setShowDeleteModal(false);
+    setProductToDelete(null);
   };
 
-  if (loading) {
-    return <div className={styles.loading}>Loading products...</div>;
+  const handleFilterChange = (filterType, value) => {
+    dispatch(setCurrentFilter({ [filterType]: value, page: 1 }));
+  };
+
+  const handlePageChange = async (newPage) => {
+    setActionLoading(prev => ({ ...prev, pagination: true }));
+    try {
+    dispatch(setCurrentFilter({ page: newPage }));
+      await dispatch(fetchProducts({ ...currentFilter, page: newPage }));
+    } finally {
+      setActionLoading(prev => ({ ...prev, pagination: false }));
+    }
+  };
+
+  if (loading && products.length === 0) {
+    return (
+      <div className={styles.dashboardContainer}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <div>Loading products...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* Sidebar */}
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-        <div className={styles.sidebarHeader}>
-          <h2 className={styles.sidebarTitle}>Admin Panel</h2>
-          <button 
-            className={styles.closeSidebarBtn} 
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            ✕
-          </button>
-        </div>
-        <nav className={styles.navMenu}>
-          <ul className={styles.navList}>
-            {navItems.map((item) => (
-              <li key={item.path} className={styles.navItem}>
-                <Link 
-                  to={item.path} 
-                  className={styles.navLink}
-                  onClick={() => window.innerWidth <= 768 && setSidebarOpen(false)}
-                >
-                  <span className={styles.navIcon}>{item.icon}</span>
-                  <span className={styles.navText}>{item.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </aside>
+      <LoadingOverlay 
+        show={loading || actionLoading.delete || actionLoading.pagination}
+        message={
+          actionLoading.delete ? 'Deleting product...' :
+          actionLoading.pagination ? 'Loading page...' :
+          'Loading products...'
+        }
+      />
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
       {/* Main Content */}
-      <main className={styles.mainContent}>
-        <header className={styles.dashboardHeader}>
-          <button 
-            className={styles.menuToggleBtn} 
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle menu"
-          >
-            ☰
-          </button>
-          <h1 className={styles.dashboardTitle}>Product Management</h1>
-          <button className={styles.logoutBtn} onClick={() => {
-            dispatch(adminLogout());
-            navigate('/login');
-          }}>
-            Logout
-          </button>
-        </header>
+      <main className={`${styles.mainContent} ${!sidebarOpen ? styles.mainContentExpanded : ''}`}>
+        <Header 
+          title="Product Management"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
         
         <div className={styles.dashboardContent}>
-          {!showForm ? (
-            <>
+          {loading && products.length > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem 1rem',
+              backgroundColor: '#eff6ff',
+              border: '1px solid #3b82f6',
+              borderRadius: '6px',
+              color: '#1e40af',
+              fontSize: '0.9rem',
+              fontWeight: '500',
+              marginBottom: '1rem',
+              justifyContent: 'center'
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #3b82f6',
+                borderTopColor: 'transparent',
+                borderRadius: '50%',
+                animation: 'spin 0.8s linear infinite'
+              }}></div>
+              <span>Refreshing products...</span>
+            </div>
+          )}
               <div className={styles.productsHeader}>
                 <h2 className={styles.productsTitle}>All Products</h2>
-                <button className={styles.addProductBtn} onClick={() => {
-                  setEditingProduct(null);
-                  setFormData({
-                    name: '',
-                    description: '',
-                    price: '',
-                    category: '',
-                    rating: '',
-                    inStock: true,
-                    stock: '',
-                    weight: '',
-                    ingredients: '',
-                    image: '',
-                    images: []
-                  });
-                  setShowForm(true);
-                }}>
+            <button 
+              className={styles.addProductBtn} 
+              onClick={() => navigate('/products/add')}
+            >
                   Add Product
                 </button>
               </div>
-    
+
+          {/* Filters */}
+          <div className={styles.filtersContainer}>
+            <div className={styles.filterGroup}>
+              <input 
+                type="text" 
+                placeholder="Search products..." 
+                value={currentFilter.search || ''}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className={styles.filterInput}
+              />
+            </div>
+            
+            <div className={styles.filterGroup}>
+              <select 
+                value={currentFilter.category || ''}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+                className={styles.filterSelect}
+              >
+                <option value="">All Categories</option>
+                {categoryNames.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className={styles.filterGroup}>
+              <select 
+                value={currentFilter.inStock || ''}
+                onChange={(e) => handleFilterChange('inStock', e.target.value)}
+                className={styles.filterSelect}
+              >
+                <option value="">All Stock Status</option>
+                <option value="true">In Stock</option>
+                <option value="false">Out of Stock</option>
+              </select>
+            </div>
+            
+            <div className={styles.filterGroup}>
+              <select 
+                value={currentFilter.sort || 'newest'}
+                onChange={(e) => handleFilterChange('sort', e.target.value)}
+                className={styles.filterSelect}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="price-high">Price: High to Low</option>
+                <option value="price-low">Price: Low to High</option>
+                <option value="name-asc">Name: A to Z</option>
+                <option value="name-desc">Name: Z to A</option>
+              </select>
+            </div>
+          </div>
+
+              {Array.isArray(products) && products.length === 0 ? (
+                <div style={{
+                  background: 'white',
+                  borderRadius: '8px',
+                  padding: '3rem',
+                  textAlign: 'center',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+                }}>
+                  <p style={{ color: '#6b7280', fontSize: '1.1rem', margin: 0 }}>
+                    No products found. Click "Add Product" to create your first product.
+                  </p>
+                </div>
+              ) : (
               <div className={styles.tableContainer}>
                 <table className={styles.table}>
                   <thead>
@@ -248,23 +244,127 @@ const Products = () => {
                               className={styles.productImage} 
                               onError={(e) => {
                                 e.target.style.display = 'none';
+                                const parent = e.target.parentElement;
+                                if (parent && !parent.querySelector('.no-image-placeholder')) {
+                                  const placeholder = document.createElement('span');
+                                  placeholder.className = 'no-image-placeholder';
+                                  placeholder.textContent = 'No Image';
+                                  placeholder.style.cssText = 'color: #9ca3af; font-size: 0.75rem; font-style: italic;';
+                                  parent.appendChild(placeholder);
+                                }
                               }}
                             />
                           ) : (
-                            <span>No Image</span>
+                            <span style={{ color: '#9ca3af', fontSize: '0.75rem', fontStyle: 'italic' }}>No Image</span>
                           )}
                         </td>
-                        <td className={styles.td}>{product._id.substring(0, 8)}...</td>
-                        <td className={styles.td}>{product.name}</td>
-                        <td className={styles.td}>{product.category}</td>
-                        <td className={styles.td}>₹{product.price}</td>
-                        <td className={styles.td}>{product.stock}</td>
-                        <td className={styles.td}>{product.inStock ? 'Yes' : 'No'}</td>
+                        <td className={styles.td}>
+                          <span style={{ 
+                            fontFamily: 'monospace', 
+                            fontSize: '0.8rem', 
+                            color: '#6b7280',
+                            background: '#f3f4f6',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '4px',
+                            display: 'inline-block'
+                          }}>
+                            {product._id.substring(0, 8)}...
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          <div style={{ 
+                            fontWeight: '600', 
+                            color: '#1f2937',
+                            fontSize: '0.95rem',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {product.name}
+                          </div>
+                          {product.description && (
+                            <div style={{ 
+                              fontSize: '0.75rem', 
+                              color: '#6b7280', 
+                              marginTop: '0.25rem',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: '200px',
+                              lineHeight: '1.4'
+                            }}>
+                              {product.description}
+                            </div>
+                          )}
+                        </td>
+                        <td className={styles.td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '12px',
+                            backgroundColor: '#e0e7ff',
+                            color: '#3730a3',
+                            fontSize: '0.8rem',
+                            fontWeight: '500'
+                          }}>
+                            {product.category}
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          <span style={{ 
+                            fontWeight: '600', 
+                            color: '#059669',
+                            fontSize: '1rem'
+                          }}>
+                            ₹{Number(product.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '0.35rem 0.85rem',
+                            borderRadius: '6px',
+                            backgroundColor: product.stock > 10 ? '#dcfce7' : product.stock > 0 ? '#fef3c7' : '#fee2e2',
+                            color: product.stock > 10 ? '#166534' : product.stock > 0 ? '#92400e' : '#991b1b',
+                            fontSize: '0.85rem',
+                            fontWeight: '600',
+                            minWidth: '60px',
+                            textAlign: 'center',
+                            fontFamily: 'monospace'
+                          }}>
+                            {product.stock || 0}
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          {(() => {
+                            const isActuallyInStock = product.inStock && product.stock > 0;
+                            return (
+                              <span style={{
+                                display: 'inline-block',
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '6px',
+                                backgroundColor: isActuallyInStock ? '#dcfce7' : '#fee2e2',
+                                color: isActuallyInStock ? '#166534' : '#991b1b',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                textTransform: 'uppercase'
+                              }}>
+                                {isActuallyInStock ? '✓ Yes' : '✗ No'}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className={styles.actionsCell}>
-                          <button className={styles.editBtn} onClick={() => handleEdit(product)}>
+                          <button 
+                            className={styles.editBtn} 
+                            onClick={() => handleEdit(product)}
+                            disabled={loading || actionLoading.delete}
+                          >
                             Edit
                           </button>
-                          <button className={styles.deleteBtn} onClick={() => handleDelete(product._id)}>
+                          <button 
+                            className={styles.deleteBtn} 
+                            onClick={() => handleDelete(product)}
+                            disabled={loading || actionLoading.delete}
+                          >
                             Delete
                           </button>
                         </td>
@@ -272,275 +372,53 @@ const Products = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </>
-          ) : (
-            <div className={styles.formContainer}>
-              <h2 className={styles.formTitle}>{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
-              <form onSubmit={handleSubmit}>
-                <div className={styles.formGrid}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="name">Name:</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="category">Category:</label>
-                    <input
-                      type="text"
-                      id="category"
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="price">Price:</label>
-                    <input
-                      type="number"
-                      id="price"
-                      name="price"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="stock">Stock:</label>
-                    <input
-                      type="number"
-                      id="stock"
-                      name="stock"
-                      value={formData.stock}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="rating">Rating:</label>
-                    <input
-                      type="number"
-                      id="rating"
-                      name="rating"
-                      step="0.1"
-                      value={formData.rating}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="weight">Weight:</label>
-                    <input
-                      type="text"
-                      id="weight"
-                      name="weight"
-                      value={formData.weight}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="description">Description:</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        name="inStock"
-                        checked={formData.inStock}
-                        onChange={handleInputChange}
-                      />
-                      &nbsp;In Stock
-                    </label>
-                  </div>
-                </div>
-                
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="ingredients">Ingredients (comma separated):</label>
-                    <input
-                      type="text"
-                      id="ingredients"
-                      name="ingredients"
-                      value={formData.ingredients}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Cocoa beans, Sugar, Milk"
-                    />
-                  </div>
-                </div>
-                              
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label htmlFor="mainImageUpload">Main Image:</label>
-                    <input
-                      type="file"
-                      id="mainImageUpload"
-                      name="mainImageUpload"
-                      accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          try {
-                            const uploadResponse = await uploadService.uploadProductImages([file]);
-                            if (uploadResponse.data && uploadResponse.data.imageUrls && uploadResponse.data.imageUrls.length > 0) {
-                              const imageUrl = uploadResponse.data.imageUrls[0];
-                              
-                              // Set the uploaded image as the main image and also add it to the images array
-                              setFormData(prev => ({
-                                ...prev,
-                                image: imageUrl,
-                                images: [...prev.images, imageUrl]
-                              }));
-                              
-                              console.log('Main image uploaded:', {
-                                imageUrl: imageUrl,
-                                images: [...prev.images, imageUrl]
-                              });
-                              
-                              // Clear the file input
-                              e.target.value = '';
-                              
-                              alert('Main image uploaded successfully!');
-                            }
-                          } catch (error) {
-                            console.error('Error uploading main image:', error);
-                            // Check if it's a 401 error and redirect to login
-                            if (error.response?.status === 401) {
-                              alert('Session expired. Please log in again.');
-                              localStorage.removeItem('adminToken');
-                              window.location.href = '/login';
-                            }
-                          }
-                        }
-                      }}
-                    />
-                    <small className={styles.helpText}>Upload main product image (will be set automatically)</small>
-                    
-                    {/* Display the Cloudinary URL if available */}
-                    {formData.image && formData.image !== '🍫' && (
-                      <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '4px', border: '1px solid #eee' }}>
-                        <p style={{ margin: '0 0 5px 0', fontWeight: 'bold', fontSize: '12px', color: '#555' }}>Cloudinary Image URL:</p>
-                        <p style={{ margin: '0', fontSize: '12px', wordBreak: 'break-all', color: '#666' }}>{formData.image}</p>
                       </div>
                     )}
                     
-                    {formData.image && formData.image !== '🍫' && (
-                      <div className={styles.imagePreview}>
-                        <img 
-                          src={formData.image} 
-                          alt="Main Preview" 
-                          style={{ maxWidth: '200px', maxHeight: '200px', marginTop: '10px', border: '1px solid #ddd', borderRadius: '4px' }}
-                          onError={(e) => {
-                            console.log('Image failed to load:', e.target.src);
-                            // Replace with fallback content instead of hiding
-                            e.target.style.display = 'none';
-                            
-                            // Find the parent container and add error message
-                            const parentDiv = e.target.parentElement;
-                            if (parentDiv) {
-                              const errorDiv = document.createElement('div');
-                              errorDiv.textContent = 'Failed to load image';
-                              errorDiv.style.width = '200px';
-                              errorDiv.style.height = '200px';
-                              errorDiv.style.border = '1px solid #ddd';
-                              errorDiv.style.borderRadius = '4px';
-                              errorDiv.style.display = 'flex';
-                              errorDiv.style.alignItems = 'center';
-                              errorDiv.style.justifyContent = 'center';
-                              errorDiv.style.backgroundColor = '#f9f9f9';
-                              errorDiv.style.color = '#999';
-                              errorDiv.style.marginTop = '10px';
-                              parentDiv.appendChild(errorDiv);
-                            }
-                          }}
-                        />
-                        <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                          Main image preview
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Display additional images */}
-                <div className={styles.formRow}>
-                  <div className={styles.formGroup}>
-                    <label>Additional Images:</label>
-                    {formData.images.length > 0 && (
-                      <div className={styles.additionalImagesContainer}>
-                        {formData.images.map((imgUrl, index) => (
-                          <div key={index} className={styles.additionalImageWrapper}>
-                            <img 
-                              src={imgUrl} 
-                              alt={`Additional ${index + 1}`} 
-                              className={styles.additionalImage}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                // Remove image from images array
-                                setFormData(prev => ({
-                                  ...prev,
-                                  images: prev.images.filter((_, i) => i !== index)
-                                }));
-                              }}
-                              className={styles.removeImageButton}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {formData.images.length === 0 && (
-                      <p style={{ fontStyle: 'italic', color: '#666' }}>No additional images uploaded</p>
-                    )}
-                  </div>
-                </div>
-                              
-                
-                
-                <div className={styles.formActions}>
-                  <button type="button" className={styles.cancelBtn} onClick={handleCancel}>
-                    Cancel
+          {/* Pagination */}
+          {pagination && pagination.pages > 1 && (
+            <div className={styles.paginationContainer}>
+                        <button
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1 || actionLoading.pagination || loading}
+                className={styles.paginationBtn}
+                        >
+                {actionLoading.pagination ? 'Loading...' : 'Previous'}
+                        </button>
+              
+              <span className={styles.paginationInfo}>
+                Page {pagination.page} of {pagination.pages} ({pagination.total || products.length} total)
+              </span>
+              
+                                <button
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.pages || actionLoading.pagination || loading}
+                className={styles.paginationBtn}
+              >
+                {actionLoading.pagination ? 'Loading...' : 'Next'}
                   </button>
-                  <button type="submit" className={styles.saveBtn}>
-                    {editingProduct ? 'Update Product' : 'Save Product'}
-                  </button>
-                </div>
-              </form>
             </div>
           )}
         </div>
       </main>
-      
-      {/* Overlay for mobile */}
-      {sidebarOpen && <div 
-        className={styles.overlay} 
-        onClick={() => setSidebarOpen(false)}
-      />}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        title="Delete Product"
+        message="Are you sure you want to delete this product?"
+        itemName={productToDelete?.name}
+        itemDetails={productToDelete ? [
+          { label: 'ID', value: productToDelete._id.substring(0, 8) + '...' },
+          { label: 'Category', value: productToDelete.category || 'N/A' },
+          { label: 'Price', value: `₹${Number(productToDelete.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+        ] : []}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+        loading={actionLoading.delete}
+        confirmText="Delete Product"
+        cancelText="Cancel"
+      />
     </div>
   );
 };

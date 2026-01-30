@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🏥 Running health check for ChocoDelight app...\n');
+
 
 const checks = [
   {
@@ -127,22 +127,17 @@ let allPassed = true;
 
 checks.forEach(check => {
   const result = check.check();
-  console.log(`${result.status} ${check.name}: ${result.message}`);
+  
   if (result.status === '❌') {
     allPassed = false;
   }
 });
 
-console.log('\n' + '='.repeat(50));
+
 
 if (allPassed) {
-  console.log('🎉 All checks passed! The application is ready for testing.');
-  console.log('\n💡 Next steps:');
-  console.log('   1. Ensure you have sufficient disk space (> 2GB free)');
-  console.log('   2. Run: npm run clean');
-  console.log('   3. Run: npm run android');
-  console.log('   4. Or: npm run ios');
+  
 } else {
-  console.log('⚠️  Some checks failed. Please review the issues above.');
+  
   process.exit(1);
 }

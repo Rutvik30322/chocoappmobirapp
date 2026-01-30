@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, ScrollView,
 import { useTheme } from '../context/ThemeContext';
 import Toast from 'react-native-toast-message';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
+import MoonIcon from '../components/MoonIcon';
+import SunIcon from '../components/SunIcon';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { login, clearError, clearSuccess } from '../store/slices/authSlice';
 
@@ -79,15 +82,17 @@ const LoginScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-            <Text style={{ color: colors.primary }}>
-              {theme === 'light' ? '🌙' : '☀️'}
-            </Text>
+            {theme === 'light' ? (
+              <MoonIcon size={24} color={colors.primary} />
+            ) : (
+              <SunIcon size={24} color={colors.primary} />
+            )}
           </TouchableOpacity>
         </View>
 
         {/* Logo/Icon */}
         <View style={styles.logoContainer}>
-          <Text style={[styles.logoText, { color: colors.primary }]}>🍫</Text>
+          <Logo size={120} />
         </View>
 
         {/* App Title */}
@@ -241,7 +246,7 @@ const styles = StyleSheet.create({
   eyeButton: {
     position: 'absolute',
     right: 15,
-    top: 15,
+    top: 10,
     padding: 5,
   },
   eyeIcon: {

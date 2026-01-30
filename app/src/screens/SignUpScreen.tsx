@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Keyboa
 import { useTheme } from '../context/ThemeContext';
 import Toast from 'react-native-toast-message';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { register, clearError, clearSuccess } from '../store/slices/authSlice';
 
@@ -131,7 +132,7 @@ const SignUpScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
         {/* Logo/Icon */}
         <View style={styles.logoContainer}>
-          <Text style={[styles.logoText, { color: colors.primary }]}>🍫</Text>
+          <Logo size={120} />
         </View>
 
         {/* Title */}

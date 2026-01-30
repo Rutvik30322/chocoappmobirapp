@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import styles from './Login.module.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,8 +19,11 @@ const Login = () => {
     setLoading(true);
 
     try {
+      // Login with mobile number only
+      const credentials = { mobile, password };
+
       // Dispatch the admin login action
-      const result = await dispatch(adminLogin({ email, password }));
+      const result = await dispatch(adminLogin(credentials));
       
       if (result.meta.requestStatus === 'fulfilled') {
         // Login successful, navigate to dashboard
@@ -48,13 +51,15 @@ const Login = () => {
         {error && <div className={styles.errorMessage}>{error}</div>}
         <form className={styles.loginForm} onSubmit={handleSubmit}>
           <div className={styles.formGroup}>
-            <label htmlFor="email">Email Address</label>
+            <label htmlFor="mobile">Mobile Number</label>
             <input
-              type="email"
-              id="email"
-              placeholder="Enter your admin email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="tel"
+              id="mobile"
+              placeholder="Enter your 10-digit mobile number"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value.replace(/[^0-9]/g, '').substring(0, 10))}
+              pattern="[0-9]{10}"
+              maxLength={10}
               required
             />
           </div>
@@ -73,6 +78,22 @@ const Login = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/forgot-password')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#6b46c1',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontSize: '14px',
+            }}
+          >
+            Forgot Password?
+          </button>
+        </div>
       </div>
     </div>
   );

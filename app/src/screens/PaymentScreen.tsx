@@ -1,57 +1,186 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking, Platform, ActivityIndicator } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import RazorpayCheckout from 'react-native-razorpay';
 import { useCart } from '../context/CartContext';
 import Toast from 'react-native-toast-message';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
+import addressService, { Address } from '../services/addressService';
+import orderService from '../services/orderService';
 
 const PaymentScreen: React.FC<{ route: any, navigation: any }> = ({ route, navigation }) => {
   const { colors, theme } = useTheme();
   const { items, getTotalPrice, clearCart } = useCart();
+  const [loading, setLoading] = useState(false);
+  const [defaultAddress, setDefaultAddress] = useState<Address | null>(null);
+  const [loadingAddress, setLoadingAddress] = useState(true);
   
   const shipping = 248; // INR
   const tax = Math.round(getTotalPrice() * 0.08);
   const total = getTotalPrice() + shipping + tax;
 
+  // Load default address on mount
+  useEffect(() => {
+    loadDefaultAddress();
+  }, []);
+
+  // Reload address when screen comes into focus (e.g., after adding/editing address)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadDefaultAddress();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadDefaultAddress = async () => {
+    try {
+      setLoadingAddress(true);
+      const response = await addressService.getAddresses();
+      if (response.data && response.data.addresses) {
+        const addresses: Address[] = response.data.addresses;
+        const defaultAddr = addresses.find(addr => addr.isDefault) || addresses[0];
+        setDefaultAddress(defaultAddr || null);
+        
+        if (!defaultAddr) {
+          Toast.show({
+            type: 'error',
+            text1: 'No Address Found',
+            text2: 'Please add a delivery address before placing an order',
+            visibilityTime: 3000,
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Error loading address:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to load address',
+        visibilityTime: 2000,
+      });
+    } finally {
+      setLoadingAddress(false);
+    }
+  };
+
+  const createOrder = async (paymentMethod: string, paymentResult?: any) => {
+    if (!defaultAddress) {
+      Toast.show({
+        type: 'error',
+        text1: 'No Address',
+        text2: 'Please add a delivery address',
+        visibilityTime: 2000,
+      });
+      navigation.navigate('DeliveryAddress');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Prepare order items
+      const orderItems = items.map(item => ({
+        product: item.id, // item.id is the product ID
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image,
+      }));
+
+      // Prepare shipping address
+      const shippingAddress = {
+        addressLine: defaultAddress.addressLine,
+        city: defaultAddress.city,
+        state: defaultAddress.state,
+        pincode: defaultAddress.pincode,
+      };
+
+      // Create order
+      const orderData = {
+        orderItems,
+        shippingAddress,
+        paymentMethod,
+        itemsPrice: getTotalPrice(),
+        taxPrice: tax,
+        shippingPrice: shipping,
+        totalPrice: total,
+      };
+
+      const response = await orderService.createOrder(orderData);
+      
+      // If payment was successful, update order to paid
+      if (paymentMethod !== 'COD' && paymentResult) {
+        await orderService.updateOrderToPaid(response.data.order._id, paymentResult);
+      }
+
+      // Clear cart (both local and backend)
+      // Note: Backend cart is already cleared in orderController, but we clear local cart here
+      await clearCart();
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Order Placed!',
+        text2: 'Your order has been placed successfully.',
+        visibilityTime: 3000,
+      });
+      
+      // Navigate to orders screen
+      navigation.navigate('HomeTabs', { screen: 'Orders' });
+    } catch (error: any) {
+      console.error('Error creating order:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Order Failed',
+        text2: error.message || 'Failed to place order',
+        visibilityTime: 3000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Function to handle payment
   const handlePayment = async () => {
+    if (!defaultAddress) {
+      Toast.show({
+        type: 'error',
+        text1: 'No Address',
+        text2: 'Please add a delivery address',
+        visibilityTime: 2000,
+      });
+      navigation.navigate('DeliveryAddress');
+      return;
+    }
+
     try {
       const options = {
         description: 'Chocolate Purchase',
         image: 'https://your-logo-url.com/your_logo.png', // Replace with your logo URL
         currency: 'INR',
-        key: 'rzp_test_1DP5mmOlF5G5ag', // Test key - replace with your actual test key
+        key: 'rzp_test_S1IoKwDjSAj21I', // Test key - replace with your actual test key
         amount: total * 100, // Amount in paisa (multiply by 100 to convert to paisa)
         name: 'EcomApp Chocolate Store',
         prefill: {
           email: 'customer@example.com',
-          contact: '9999999999',
-          name: 'Customer Name'
+          contact: defaultAddress.phone || '9999999999',
+          name: defaultAddress.name || 'Customer Name'
         },
         theme: { color: colors.primary }
       };
 
       const data = await RazorpayCheckout.open(options);
       
-      // Payment successful
-      console.log(data);
-      
-      // Clear cart after successful payment
-      clearCart();
-      
-      // Show success message
-      Toast.show({
-        type: 'success',
-        text1: 'Payment Successful!',
-        text2: 'Your order has been placed successfully.',
-        visibilityTime: 3000,
+      // Payment successful - create order
+      await createOrder('Razorpay', {
+        id: data.razorpay_payment_id,
+        status: 'success',
+        updateTime: new Date().toISOString(),
+        emailAddress: data.razorpay_email || '',
       });
-      
-      // Navigate to home tabs screen
-      navigation.navigate('HomeTabs');
     } catch (error: any) {
-      console.log(error);
+    
       
       // Check if it's a user cancellation
       if (error.code === 'payment_cancelled') {
@@ -81,19 +210,21 @@ const PaymentScreen: React.FC<{ route: any, navigation: any }> = ({ route, navig
   const [showCodModal, setShowCodModal] = useState(false);
   
   // Confirm COD
-  const confirmCod = () => {
-    // Clear cart after COD order
-    clearCart();
-    
-    Toast.show({
-      type: 'success',
-      text1: 'Order Placed!',
-      text2: 'Your order has been placed successfully with Cash on Delivery.',
-      visibilityTime: 3000,
-    });
-    
-    navigation.navigate('HomeTabs');
+  const confirmCod = async () => {
+    if (!defaultAddress) {
+      Toast.show({
+        type: 'error',
+        text1: 'No Address',
+        text2: 'Please add a delivery address',
+        visibilityTime: 2000,
+      });
+      setShowCodModal(false);
+      navigation.navigate('DeliveryAddress');
+      return;
+    }
+
     setShowCodModal(false);
+    await createOrder('COD');
   };
   
   // Cancel COD
@@ -112,10 +243,59 @@ const PaymentScreen: React.FC<{ route: any, navigation: any }> = ({ route, navig
         >
           <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
         </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Logo size={30} style={styles.headerLogo} />
         <Text style={[styles.headerTitle, { color: colors.text }]}>Payment Options</Text>
+        </View>
         <View style={styles.headerSpacer} />
       </View>
       <Text style={[styles.title, { color: colors.text }]}>Payment Options</Text>
+      
+      {/* Address Display */}
+      {loadingAddress ? (
+        <View style={[styles.addressCard, { backgroundColor: colors.surface, padding: 15 }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.addressText, { color: colors.textSecondary, marginTop: 10 }]}>
+            Loading address...
+          </Text>
+        </View>
+      ) : defaultAddress ? (
+        <View style={[styles.addressCard, { backgroundColor: colors.surface, elevation: 2 }]}>
+          <Text style={[styles.addressTitle, { color: colors.text, fontWeight: 'bold', marginBottom: 8 }]}>
+            Delivery Address
+          </Text>
+          <Text style={[styles.addressText, { color: colors.text }]}>
+            {defaultAddress.addressLine}, {defaultAddress.city}, {defaultAddress.state} - {defaultAddress.pincode}
+          </Text>
+          {defaultAddress.phone && (
+            <Text style={[styles.addressPhone, { color: colors.textSecondary, marginTop: 5 }]}>
+              📞 {defaultAddress.phone}
+            </Text>
+          )}
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('DeliveryAddress')}
+            style={{ marginTop: 10 }}
+          >
+            <Text style={[styles.changeAddressText, { color: colors.primary }]}>
+              Change Address
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={[styles.addressCard, { backgroundColor: colors.error + '20', padding: 15 }]}>
+          <Text style={[styles.addressText, { color: colors.error, fontWeight: 'bold' }]}>
+            ⚠️ No delivery address found
+          </Text>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('DeliveryAddress')}
+            style={{ marginTop: 10 }}
+          >
+            <Text style={[styles.changeAddressText, { color: colors.primary }]}>
+              Add Address
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       
       {/* Order Summary */}
       <View style={[styles.summary, { backgroundColor: colors.surface, elevation: 3 }]}>
@@ -147,21 +327,47 @@ const PaymentScreen: React.FC<{ route: any, navigation: any }> = ({ route, navig
       {/* Payment Options */}
       <View style={styles.paymentOptions}>
         <TouchableOpacity 
-          style={[styles.paymentOption, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 }]}
+          style={[
+            styles.paymentOption, 
+            { 
+              backgroundColor: colors.surface, 
+              borderColor: colors.primary, 
+              borderWidth: 1,
+              opacity: (!defaultAddress || loading) ? 0.5 : 1
+            }
+          ]}
           onPress={handlePayment}
+          disabled={!defaultAddress || loading}
         >
-          <Text style={[styles.paymentOptionText, { color: colors.primary, fontWeight: 'bold' }]}>
-            Pay with Razorpay
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={[styles.paymentOptionText, { color: colors.primary, fontWeight: 'bold' }]}>
+              Pay with Razorpay
+            </Text>
+          )}
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.paymentOption, { backgroundColor: colors.surface, borderColor: colors.textSecondary, borderWidth: 1 }]}
+          style={[
+            styles.paymentOption, 
+            { 
+              backgroundColor: colors.surface, 
+              borderColor: colors.textSecondary, 
+              borderWidth: 1,
+              opacity: (!defaultAddress || loading) ? 0.5 : 1
+            }
+          ]}
           onPress={handleCashOnDelivery}
+          disabled={!defaultAddress || loading}
         >
-          <Text style={[styles.paymentOptionText, { color: colors.text }]}>
-            Cash on Delivery
-          </Text>
+          {loading ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <Text style={[styles.paymentOptionText, { color: colors.text }]}>
+              Cash on Delivery
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
       
@@ -278,6 +484,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerLogo: {
+    marginRight: 8,
+  },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
@@ -342,6 +557,25 @@ const styles = StyleSheet.create({
   codModalConfirmButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  addressCard: {
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+  },
+  addressTitle: {
+    fontSize: 16,
+  },
+  addressText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  addressPhone: {
+    fontSize: 12,
+  },
+  changeAddressText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

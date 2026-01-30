@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import ThemedLayout from '../components/ThemedLayout';
+import Logo from '../components/Logo';
 
-const AboutScreen: React.FC = () => {
+const AboutScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { colors, theme } = useTheme();
 
   const handlePrivacyPolicy = () => {
@@ -19,8 +20,28 @@ const AboutScreen: React.FC = () => {
   };
 
   return (
-    <ThemedLayout>
+    <ThemedLayout edges={['top']}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header with back button */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.surface }]}>        
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation?.goBack()}
+        >
+          <Text style={[styles.backButtonText, { color: colors.text }]}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTitleContainer}>
+          <Logo size={30} style={styles.headerLogo} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>About</Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <Text style={[styles.appName, { color: colors.text }]}>EcomApp</Text>
         <Text style={[styles.version, { color: colors.textSecondary }]}>Version 1.0.0</Text>
@@ -89,6 +110,7 @@ const AboutScreen: React.FC = () => {
           <Text style={[styles.optionText, { color: colors.text }]}>Visit Our Website</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
     </View>
     </ThemedLayout>
   );
@@ -97,7 +119,46 @@ const AboutScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  backButton: {
+    padding: 10,
+  },
+  backButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerLogo: {
+    marginRight: 8,
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     alignItems: 'center',

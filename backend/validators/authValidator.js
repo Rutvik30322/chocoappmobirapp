@@ -40,13 +40,12 @@ export const loginValidation = [
     .notEmpty().withMessage('Password is required'),
 ];
 
-// Admin Login Validation
+// Admin Login Validation (mobile only)
 export const adminLoginValidation = [
-  body('email')
+  body('mobile')
     .trim()
-    .notEmpty().withMessage('Email is required')
-    .isEmail().withMessage('Please provide a valid email')
-    .normalizeEmail(),
+    .notEmpty().withMessage('Mobile number is required')
+    .matches(/^[0-9]{10}$/).withMessage('Please provide a valid 10-digit mobile number'),
   
   body('password')
     .notEmpty().withMessage('Password is required'),

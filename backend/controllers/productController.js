@@ -16,17 +16,24 @@ const isDefaultEmoji = (str) => {
  */
 export const getAllProducts = async (req, res, next) => {
   try {
-    console.log('getAllProducts called with query:', req.query);
     
-    const { category, search, minPrice, maxPrice, inStock, sort, page = 1, limit = 20 } = req.query;
+    
+    const { category, search, minPrice, maxPrice, inStock, sort, page = 1, limit } = req.query;
 
     // Validate and sanitize inputs
     const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 20;
+    // If limit is not provided or is 'all', fetch all products (no limit)
+    // Otherwise, use the provided limit with a max of 1000
+    const limitNum = limit === 'all' || limit === undefined ? undefined : parseInt(limit) || 20;
     
-    // Ensure page and limit are positive integers
-    if (pageNum < 1 || limitNum < 1 || limitNum > 100) {
-      throw new ApiError(400, 'Invalid page or limit parameters');
+    // Ensure page is positive integer
+    if (pageNum < 1) {
+      throw new ApiError(400, 'Invalid page parameter');
+    }
+    
+    // Ensure limit is positive integer if provided
+    if (limitNum !== undefined && (limitNum < 1 || limitNum > 10000)) {
+      throw new ApiError(400, 'Invalid limit parameter. Must be between 1 and 10000, or use "all" to fetch all products');
     }
 
     // Build query
@@ -69,25 +76,31 @@ export const getAllProducts = async (req, res, next) => {
     else sortOption.createdAt = -1; // Default
 
     // Pagination
+    let products;
+    let total = await Product.countDocuments(query);
+    
+    if (limitNum === undefined) {
+      // Fetch all products (no pagination)
+      products = await Product.find(query).sort(sortOption);
+    } else {
+      // Fetch with pagination
     const skip = (pageNum - 1) * limitNum;
-
-    const products = await Product.find(query)
+      products = await Product.find(query)
       .sort(sortOption)
       .limit(limitNum)
       .skip(skip);
-
-    const total = await Product.countDocuments(query);
+    }
 
     return successResponse(res, 200, 'Products fetched successfully', {
       products,
       pagination: {
         total,
         page: pageNum,
-        pages: Math.ceil(total / limitNum),
+        pages: limitNum ? Math.ceil(total / limitNum) : 1,
+        limit: limitNum || total,
       },
     });
   } catch (error) {
-    console.log('Error in getAllProducts:', error.message);
     next(error);
   }
 };
@@ -118,38 +131,45 @@ export const getProductById = async (req, res, next) => {
  */
 export const createProduct = async (req, res, next) => {
   try {
-    console.log('Creating product, req.body:', req.body);
-    console.log('req.image:', req.image);
-    console.log('req.images:', req.images);
     
     const productData = { ...req.body };
     
     // Remove default emoji from productData if present in original body
     if (productData.image && isDefaultEmoji(productData.image)) {
-      console.log('Removing default emoji from productData.image');
       delete productData.image; // Don't create with default emoji
     }
     
     // Handle image field if present from middleware (processed image upload)
     if (req.image && !isDefaultEmoji(req.image)) {
       productData.image = req.image;
-      console.log('Set productData.image to:', req.image);
     }
     
     // Handle images array if present in request
     if (req.images && Array.isArray(req.images)) {
       productData.images = req.images;
-      console.log('Set productData.images to:', req.images);
     }
     
-    console.log('Final productData:', productData);
+    // Handle file uploads from form fields
+    if (req.files) {
+      // Handle main image upload
+      if (req.files.mainImage && req.files.mainImage[0]) {
+        productData.image = req.files.mainImage[0].path;
+      }
+      
+      // Handle additional images upload
+      if (req.files.additionalImages && req.files.additionalImages.length > 0) {
+        const additionalImageUrls = req.files.additionalImages.map(file => file.path);
+        if (!productData.images) {
+          productData.images = [];
+        }
+        productData.images = [...productData.images, ...additionalImageUrls];
+      }
+    }
     
     const product = await Product.create(productData);
-    console.log('Created product:', product);
 
     return successResponse(res, 201, 'Product created successfully', { product });
   } catch (error) {
-    console.error('Error creating product:', error);
     next(error);
   }
 };
@@ -161,31 +181,69 @@ export const createProduct = async (req, res, next) => {
  */
 export const updateProduct = async (req, res, next) => {
   try {
-    console.log('Updating product, req.body:', req.body);
-    console.log('req.image:', req.image);
-    console.log('req.images:', req.images);
     
     const productData = { ...req.body };
     
     // Remove default emoji from productData if present in original body
     if (productData.image && isDefaultEmoji(productData.image)) {
-      console.log('Removing default emoji from productData.image');
       delete productData.image; // Don't update image if it's the default emoji
     }
     
-    // Handle image field if present from middleware (processed image upload)
-    if (req.image && !isDefaultEmoji(req.image)) {
-      productData.image = req.image;
-      console.log('Set productData.image to:', req.image);
+    // Handle image field - prioritize middleware processed image, then req.body.image
+    // Check if we have a valid image URL from any source
+    const hasValidImageFromMiddleware = req.image && 
+                                       typeof req.image === 'string' && 
+                                       req.image.trim() !== '' && 
+                                       !isDefaultEmoji(req.image) &&
+                                       (req.image.startsWith('http://') || req.image.startsWith('https://'));
+    
+    const hasValidImageFromBody = productData.image && 
+                                  typeof productData.image === 'string' && 
+                                  productData.image.trim() !== '' && 
+                                  !isDefaultEmoji(productData.image) &&
+                                  (productData.image.startsWith('http://') || productData.image.startsWith('https://'));
+    
+    if (hasValidImageFromMiddleware) {
+      productData.image = req.image.trim();
+    } 
+    else if (hasValidImageFromBody) {
+      // Keep the image from req.body if it's a valid URL
+      productData.image = productData.image.trim();
+    }
+    // If image is empty string, null, or undefined, remove it to preserve existing image
+    else if (productData.image === '' || productData.image === null || productData.image === undefined) {
+      delete productData.image;
+    }
+    // If image exists but is invalid (not a URL), log warning but remove it
+    else if (productData.image) {
+      delete productData.image;
     }
     
     // Handle images array if present in request
-    if (req.images && Array.isArray(req.images)) {
+    if (req.images && Array.isArray(req.images) && req.images.length > 0) {
       productData.images = req.images;
-      console.log('Set productData.images to:', req.images);
+    } else if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
+      // If middleware didn't set req.images but req.body has images, use them
+      productData.images = req.body.images;
     }
     
-    console.log('Final productData for update:', productData);
+    // Handle file uploads from form fields (multipart/form-data)
+    if (req.files) {
+      // Handle main image upload
+      if (req.files.mainImage && req.files.mainImage[0]) {
+        productData.image = req.files.mainImage[0].path;
+      }
+      
+      // Handle additional images upload
+      if (req.files.additionalImages && req.files.additionalImages.length > 0) {
+        const additionalImageUrls = req.files.additionalImages.map(file => file.path);
+        if (!productData.images) {
+          productData.images = [];
+        }
+        productData.images = [...productData.images, ...additionalImageUrls];
+      }
+    }
+    
     
     const product = await Product.findByIdAndUpdate(
       req.params.id,
@@ -197,7 +255,6 @@ export const updateProduct = async (req, res, next) => {
       throw new ApiError(404, 'Product not found');
     }
     
-    console.log('Updated product:', product);
 
     return successResponse(res, 200, 'Product updated successfully', { product });
   } catch (error) {
@@ -226,23 +283,25 @@ export const deleteProduct = async (req, res, next) => {
 };
 
 /**
- * @desc    Get all categories
+ * @desc    Get all categories (deprecated - use /api/categories instead)
  * @route   GET /api/products/categories/all
  * @access  Public
  */
 export const getCategories = async (req, res, next) => {
   try {
-    const categories = [
-      { id: '1', name: 'Bars', icon: '🍫' },
-      { id: '2', name: 'Truffles', icon: '🍬' },
-      { id: '3', name: 'Fudge', icon: '🍮' },
-      { id: '4', name: 'Pralines', icon: '🌰' },
-      { id: '5', name: 'Fruits', icon: '🍓' },
-      { id: '6', name: 'Caramels', icon: '🍯' },
-      { id: '7', name: 'Flavored', icon: '🍊' },
-    ];
+    // Import Category model
+    const Category = (await import('../models/Category.js')).default;
+    
+    const categories = await Category.find({ isActive: true }).sort({ name: 1 });
+    
+    // Format to match old response structure for backward compatibility
+    const formattedCategories = categories.map(cat => ({
+      id: cat._id.toString(),
+      name: cat.name,
+      icon: cat.icon || '🍫',
+    }));
 
-    return successResponse(res, 200, 'Categories fetched successfully', { categories });
+    return successResponse(res, 200, 'Categories fetched successfully', { categories: formattedCategories });
   } catch (error) {
     next(error);
   }

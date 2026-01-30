@@ -15,6 +15,9 @@ import AllProductsScreen from '../screens/AllProductsScreen';
 import PaymentScreen from '../screens/PaymentScreen';
 import OrderDetailScreen from '../screens/OrderDetailScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import CartScreen from '../screens/CartScreen';
+import DeliveryAddressScreen from '../screens/DeliveryAddressScreen';
+import AddAddressScreen from '../screens/AddAddressScreen';
 
 const Stack = createStackNavigator();
 
@@ -65,6 +68,11 @@ const MainNavigator: React.FC = () => {
           options={{ headerShown: false }} 
         />
         <Stack.Screen 
+          name="Cart" 
+          component={CartScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
           name="Payment" 
           component={PaymentScreen} 
           options={{ headerShown: false }} 
@@ -77,6 +85,16 @@ const MainNavigator: React.FC = () => {
         <Stack.Screen 
           name="ChangePassword" 
           component={ChangePasswordScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="DeliveryAddress" 
+          component={DeliveryAddressScreen} 
+          options={{ headerShown: false }} 
+        />
+        <Stack.Screen 
+          name="AddAddress" 
+          component={AddAddressScreen} 
           options={{ headerShown: false }} 
         />
       </Stack.Navigator>

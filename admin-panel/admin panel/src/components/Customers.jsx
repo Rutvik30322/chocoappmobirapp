@@ -1,22 +1,15 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { adminLogout } from '../store/slices/authSlice';
+import Sidebar from './Sidebar';
 import styles from './Dashboard.module.css';
 
 const Customers = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: '🏠' },
-    { name: 'Products', path: '/products', icon: '📦' },
-    { name: 'Orders', path: '/orders', icon: '📋' },
-    { name: 'Customers', path: '/customers', icon: '👥' },
-    { name: 'Categories', path: '/categories', icon: '🏷️' },
-    { name: 'Analytics', path: '/analytics', icon: '📊' },
-  ];
 
   // Sample customer data
   const customers = [
@@ -29,35 +22,7 @@ const Customers = () => {
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* Sidebar */}
-      <aside className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ''}`}>
-        <div className={styles.sidebarHeader}>
-          <h2 className={styles.sidebarTitle}>Admin Panel</h2>
-          <button 
-            className={styles.closeSidebarBtn} 
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            ✕
-          </button>
-        </div>
-        <nav className={styles.navMenu}>
-          <ul className={styles.navList}>
-            {navItems.map((item) => (
-              <li key={item.path} className={styles.navItem}>
-                <Link 
-                  to={item.path} 
-                  className={styles.navLink}
-                  onClick={() => window.innerWidth <= 768 && setSidebarOpen(false)}
-                >
-                  <span className={styles.navIcon}>{item.icon}</span>
-                  <span className={styles.navText}>{item.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </aside>
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
       
       {/* Main Content */}
       <main className={styles.mainContent}>
@@ -69,7 +34,7 @@ const Customers = () => {
           >
             ☰
           </button>
-          <h1 className={styles.dashboardTitle}>Customer Management</h1>
+          <h1 className={styles.dashboardTitle}>Customer Analytics</h1>
           <button className={styles.logoutBtn} onClick={() => {
             dispatch(adminLogout());
             navigate('/login');
@@ -154,12 +119,6 @@ const Customers = () => {
           </div>
         </div>
       </main>
-      
-      {/* Overlay for mobile */}
-      {sidebarOpen && <div 
-        className={styles.overlay} 
-        onClick={() => setSidebarOpen(false)}
-      />}
     </div>
   );
 };
